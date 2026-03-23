@@ -1,0 +1,689 @@
+import { useState, useEffect, useRef } from "react";
+
+const MIT_RED = "#A31F34";
+const MIT_GRAY = "#8A8B8C";
+const MIT_LIGHT_GRAY = "#C2C0BF";
+const MIT_WARM_WHITE = "#F2F0EF";
+
+// ─── Data ────────────────────────────────────────────────────────
+
+const TOP_CONCERNS = [
+  { name: "Cyberattacks & weapons", pct: 26.8, domain: 4 },
+  { name: "Power centralization", pct: 23.5, domain: 6 },
+  { name: "Disinformation & surveillance", pct: 22.1, domain: 4 },
+  { name: "Information ecosystem pollution", pct: 21.6, domain: 3 },
+  { name: "Dangerous capabilities", pct: 21.6, domain: 7 },
+  { name: "AI misalignment", pct: 18.3, domain: 7 },
+  { name: "Loss of human agency", pct: 18.3, domain: 5 },
+  { name: "Overreliance & unsafe use", pct: 17.8, domain: 5 },
+  { name: "Security vulnerabilities", pct: 16.4, domain: 2 },
+  { name: "Discrimination", pct: 12.7, domain: 1 },
+];
+
+const SEVERITY_DATA = [
+  { name: "Cyberattacks & weapons", bau: 21, mit: 12, short: "Cyber" },
+  { name: "Dangerous capabilities", bau: 22, mit: 12, short: "Capabilities" },
+  { name: "Power centralization", bau: 18, mit: 11, short: "Power" },
+  { name: "Competitive dynamics", bau: 17, mit: 7, short: "Competition" },
+  { name: "Environmental harm", bau: 17, mit: 12, short: "Environment" },
+  { name: "Inequality & unemployment", bau: 17, mit: 11, short: "Inequality" },
+  { name: "AI misalignment", bau: 17, mit: 9, short: "Misalignment" },
+  { name: "Security vulnerabilities", bau: 16, mit: 9, short: "Security" },
+  { name: "Governance failure", bau: 14, mit: 7, short: "Governance" },
+  { name: "Disinformation", bau: 13, mit: 7, short: "Disinfo" },
+  { name: "Information pollution", bau: 13, mit: 7, short: "Info pollution" },
+  { name: "False information", bau: 13, mit: 7, short: "False info" },
+  { name: "Multi-agent risks", bau: 12, mit: 6, short: "Multi-agent" },
+  { name: "Privacy compromise", bau: 11, mit: 7, short: "Privacy" },
+];
+
+const ACTORS = [
+  { id: "GEN", label: "General-Purpose AI Developer", short: "AI Developer", x: 28, y: 88, col: MIT_RED, examples: "OpenAI, Anthropic, Google DeepMind", desc: "Creates general-purpose foundation models with broad capabilities. Assigned highest responsibility across nearly all 24 risk domains." },
+  { id: "GOV", label: "AI Governance Actor", short: "Regulator / Govt", x: 42, y: 80, col: MIT_RED, examples: "Governments, regulators, standards bodies", desc: "Creates or enforces laws, regulations, standards for AI. Shares primary responsibility alongside developers for most risks." },
+  { id: "SPEC", label: "Specialised AI Developer", short: "Specialised Dev", x: 36, y: 74, col: "#D97706", examples: "Aidoc, Zest AI, Uptake", desc: "Creates specialised AI systems for specific industries. Moderate-to-high responsibility, particularly for domain-specific risks." },
+  { id: "DEP", label: "AI Deployer", short: "Deployer", x: 52, y: 68, col: "#D97706", examples: "JPMorgan, Walmart, Netflix, Spotify", desc: "Implements AI systems in products and services. Moderate vulnerability and responsibility, positioned between developers and users." },
+  { id: "INF", label: "Infrastructure Provider", short: "Infrastructure", x: 30, y: 44, col: "#059669", examples: "NVIDIA, AWS, Google Cloud, Azure", desc: "Provides compute, cloud, and data infrastructure. Judged least vulnerable despite enabling the substrate on which risks propagate." },
+  { id: "USR", label: "AI User", short: "User", x: 74, y: 28, col: "#6B9FE4", examples: "Businesses, developers using Copilot", desc: "Uses AI systems without significant modification. High vulnerability but at most moderate responsibility — a structural mismatch." },
+  { id: "STK", label: "Affected Stakeholder", short: "Public / Affected", x: 88, y: 20, col: "#6B9FE4", examples: "Communities impacted by AI decisions", desc: "Indirectly affected by AI decisions. Most vulnerable actor type, yet assigned lowest responsibility. The core moral hazard." },
+];
+
+const SECTORS = [
+  { name: "Information", vuln: 4.6 },
+  { name: "Finance & Insurance", vuln: 4.3 },
+  { name: "National Security", vuln: 4.2 },
+  { name: "Health Care", vuln: 3.8 },
+  { name: "Education", vuln: 3.5 },
+  { name: "Public Admin", vuln: 3.4 },
+  { name: "Professional Services", vuln: 3.3 },
+  { name: "Scientific Research", vuln: 3.2 },
+  { name: "Trade & Transport", vuln: 2.9 },
+  { name: "Arts & Entertainment", vuln: 2.6 },
+  { name: "Agriculture & Manufacturing", vuln: 2.4 },
+  { name: "Accommodation & Food", vuln: 2.2 },
+];
+
+const DOMAIN_COLORS = {
+  1: "#BE185D", 2: "#1D4ED8", 3: "#EA580C",
+  4: "#7C3AED", 5: "#059669", 6: "#D97706", 7: "#0369A1"
+};
+
+const DOMAIN_NAMES = {
+  1: "Discrimination & Toxicity", 2: "Privacy & Security", 3: "Misinformation",
+  4: "Malicious Actors", 5: "Human-Computer Interaction", 6: "Socioeconomic & Environmental", 7: "AI System Safety"
+};
+
+// ─── Section header component ────────────────────────────────────
+
+function SectionTag({ number, label }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+      <div style={{ width: 26, height: 26, borderRadius: "50%", background: MIT_RED, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: "#fff" }}>{number}</span>
+      </div>
+      <span style={{ fontSize: 12, fontWeight: 700, color: MIT_RED, letterSpacing: "0.12em", textTransform: "uppercase" }}>{label}</span>
+    </div>
+  );
+}
+
+// ─── Severity bar chart ──────────────────────────────────────────
+
+function SeverityPanel() {
+  const [hov, setHov] = useState(null);
+  const [showMit, setShowMit] = useState(false);
+  const data = SEVERITY_DATA;
+
+  return (
+    <div style={{ background: "#fff", borderRadius: 3, border: "1px solid #E8ECF0", boxShadow: "0 1px 6px rgba(0,0,0,0.04)", marginBottom: 16, overflow: "hidden" }}>
+      <div style={{ borderBottom: `3px solid ${MIT_RED}`, padding: "20px 24px 16px" }}>
+        <SectionTag number="1" label="How severe are the risks?" />
+        <h2 style={{ fontSize: 22, fontWeight: 700, color: "#000", marginBottom: 8, letterSpacing: "-0.3px", lineHeight: 1.25 }}>
+          14 of 24 AI risks have at least a 10% chance of catastrophic outcomes in the next 5 years
+        </h2>
+        <p style={{ fontSize: 14, color: MIT_GRAY, lineHeight: 1.65, maxWidth: 700, marginBottom: 12 }}>
+          272 AI experts rated the probability of catastrophic harm (more than 1 million deaths or $100 billion in loss) for each risk domain. Even with pragmatic mitigations, no risk falls below 5%.
+        </p>
+        <button onClick={() => setShowMit(!showMit)} style={{
+          fontSize: 12, fontWeight: 600, color: showMit ? "#059669" : MIT_RED,
+          background: showMit ? "#ECFDF5" : "#FEF2F2", border: `1.5px solid ${showMit ? "#059669" : MIT_RED}`,
+          borderRadius: 2, padding: "7px 14px", cursor: "pointer", transition: "all 0.2s"
+        }}>
+          {showMit ? "← Show: Business as usual" : "Show: With pragmatic mitigations →"}
+        </button>
+      </div>
+      <div style={{ padding: "16px 24px 20px" }}>
+        {data.map((r, i) => {
+          const val = showMit ? r.mit : r.bau;
+          const isHov = hov === i;
+          const isAbove10 = val >= 10;
+          const barCol = showMit
+            ? (val >= 10 ? "#DC2626" : "#059669")
+            : (val >= 10 ? MIT_RED : "#D97706");
+          return (
+            <div key={i}
+              style={{ display: "flex", alignItems: "center", gap: 0, padding: "5px 0", cursor: "pointer", borderRadius: 3, background: isHov ? "#F9FAFB" : "transparent", transition: "background 0.15s" }}
+              onMouseEnter={() => setHov(i)} onMouseLeave={() => setHov(null)}>
+              <div style={{ width: 220, flexShrink: 0, textAlign: "right", paddingRight: 14 }}>
+                <span style={{ fontSize: 12, color: isHov ? "#000" : "#555", fontWeight: isHov ? 600 : 400, transition: "all 0.15s" }}>{r.name}</span>
+              </div>
+              <div style={{ flex: 1, height: 18, background: "#F1F5F9", borderRadius: 3, position: "relative", overflow: "hidden" }}>
+                <div style={{
+                  position: "absolute", top: 0, left: 0, height: "100%", borderRadius: 3,
+                  width: `${(val / 25) * 100}%`, background: barCol,
+                  opacity: isHov ? 0.95 : 0.75, transition: "all 0.3s ease"
+                }} />
+                {/* 10% threshold marker */}
+                <div style={{ position: "absolute", top: 0, left: `${(10/25)*100}%`, width: 1, height: "100%", background: "#000", opacity: 0.15 }} />
+              </div>
+              <div style={{ width: 58, flexShrink: 0, textAlign: "right", paddingLeft: 8 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: isAbove10 ? barCol : "#888", transition: "color 0.3s" }}>{val}%</span>
+              </div>
+            </div>
+          );
+        })}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, paddingLeft: 220 }}>
+          <div style={{ width: 1, height: 14, background: "#000", opacity: 0.3 }} />
+          <span style={{ fontSize: 10, color: "#888" }}>10% catastrophic threshold</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Expert concern bar chart ────────────────────────────────────
+
+function ConcernPanel() {
+  const [hov, setHov] = useState(null);
+  const max = TOP_CONCERNS[0].pct;
+  return (
+    <div style={{ background: "#fff", borderRadius: 3, border: "1px solid #E8ECF0", boxShadow: "0 1px 6px rgba(0,0,0,0.04)", marginBottom: 16, overflow: "hidden" }}>
+      <div style={{ padding: "16px 24px 12px" }}>
+        <p style={{ fontSize: 15, fontWeight: 700, color: "#000", marginBottom: 4 }}>What concerns experts most</p>
+        <p style={{ fontSize: 12, color: MIT_GRAY, lineHeight: 1.55 }}>Percentage who selected each risk in their top three concerns for 2025-2030.</p>
+      </div>
+      <div style={{ padding: "0 24px 16px" }}>
+        {TOP_CONCERNS.map((r, i) => {
+          const isHov = hov === i;
+          const col = DOMAIN_COLORS[r.domain];
+          return (
+            <div key={i}
+              style={{ display: "flex", alignItems: "center", gap: 0, padding: "4px 0", cursor: "pointer" }}
+              onMouseEnter={() => setHov(i)} onMouseLeave={() => setHov(null)}>
+              <div style={{ width: 8, height: 8, borderRadius: 2, background: col, marginRight: 8, flexShrink: 0 }} />
+              <div style={{ width: 200, flexShrink: 0 }}>
+                <span style={{ fontSize: 11.5, color: isHov ? "#000" : "#555", fontWeight: isHov ? 600 : 400 }}>{r.name}</span>
+              </div>
+              <div style={{ flex: 1, height: 14, background: "#F1F5F9", borderRadius: 2, overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${(r.pct / 30) * 100}%`, background: col, opacity: isHov ? 0.9 : 0.6, borderRadius: 2, transition: "all 0.15s" }} />
+              </div>
+              <div style={{ width: 44, textAlign: "right", flexShrink: 0 }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: isHov ? col : "#888" }}>{r.pct}%</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Responsibility scatter ──────────────────────────────────────
+
+function MismatchPanel() {
+  const [hovered, setHovered] = useState(null);
+  const W = 520, H = 360, PAD = 48;
+  const toX = p => PAD + (p / 100) * (W - PAD * 2);
+  const toY = p => PAD + ((100 - p) / 100) * (H - PAD * 2);
+  const actor = ACTORS.find(a => a.id === hovered);
+
+  return (
+    <div style={{ background: "#000", borderRadius: 3, marginBottom: 16, borderLeft: `4px solid ${MIT_RED}`, overflow: "hidden" }}>
+      <div style={{ padding: "20px 28px 0" }}>
+        <SectionTag number="2" label="Who bears the risk vs. who bears responsibility?" />
+      </div>
+      <div style={{ display: "flex", alignItems: "stretch" }}>
+        <div style={{ padding: "8px 20px 24px 28px", width: 280, flexShrink: 0, display: "flex", flexDirection: "column", gap: 14 }}>
+          <h2 style={{ fontSize: 22, fontWeight: 700, color: "#fff", lineHeight: 1.2, letterSpacing: "-0.3px", margin: 0 }}>
+            Those most responsible for AI risks are not the most vulnerable.
+          </h2>
+          <p style={{ fontSize: 13, color: "#888", lineHeight: 1.7, margin: 0 }}>
+            AI users and affected stakeholders bear the greatest exposure to harm, yet experts assign primary responsibility to frontier developers and governance actors. This structural mismatch is the study's central finding.
+          </p>
+
+          <div style={{ flex: 1, background: actor ? "#111" : "#0a0a0a", borderRadius: 3, padding: "12px 14px", border: actor ? `1px solid ${actor.col}40` : "1px solid #1a1a1a", minHeight: 80, transition: "all 0.2s" }}>
+            {actor ? (
+              <>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <div style={{ width: 10, height: 10, borderRadius: "50%", background: actor.col }} />
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#fff" }}>{actor.label}</span>
+                </div>
+                <p style={{ fontSize: 10.5, color: "#aaa", marginBottom: 4 }}>{actor.examples}</p>
+                <p style={{ fontSize: 11, color: "#C0C6D0", lineHeight: 1.55, margin: 0 }}>{actor.desc}</p>
+              </>
+            ) : (
+              <p style={{ fontSize: 11, color: "#555", lineHeight: 1.6, margin: 0, fontStyle: "italic" }}>
+                Hover over a point to learn about each actor type and their vulnerability-responsibility position.
+              </p>
+            )}
+          </div>
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {ACTORS.map(a => (
+              <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer", opacity: hovered && hovered !== a.id ? 0.3 : 1, transition: "opacity 0.15s" }}
+                onMouseEnter={() => setHovered(a.id)} onMouseLeave={() => setHovered(null)}>
+                <div style={{ width: 7, height: 7, borderRadius: "50%", background: a.col }} />
+                <span style={{ fontSize: 10, color: "#AAB0BA" }}>{a.short}</span>
+              </div>
+            ))}
+          </div>
+
+          <button style={{ fontSize: 12, fontWeight: 700, color: MIT_RED, background: "none", border: `1.5px solid ${MIT_RED}`, borderRadius: 2, padding: "8px 16px", cursor: "pointer", alignSelf: "flex-start" }}>
+            Explore responsibility data →
+          </button>
+        </div>
+
+        <div style={{ flex: 1, padding: "12px 20px 16px 0", display: "flex", alignItems: "center" }}>
+          <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
+            {/* Quadrant shading */}
+            <rect x={PAD} y={PAD} width={(W - PAD * 2) / 2} height={(H - PAD * 2) / 2} fill={MIT_RED} fillOpacity={0.04} />
+            <rect x={PAD + (W - PAD * 2) / 2} y={PAD + (H - PAD * 2) / 2} width={(W - PAD * 2) / 2} height={(H - PAD * 2) / 2} fill="#1D4ED8" fillOpacity={0.04} />
+            {/* Grid */}
+            {[25, 50, 75].map(v => (
+              <g key={v}>
+                <line x1={toX(v)} y1={PAD} x2={toX(v)} y2={H - PAD} stroke="#3a3a3a" strokeWidth={1} />
+                <line x1={PAD} y1={toY(v)} x2={W - PAD} y2={toY(v)} stroke="#3a3a3a" strokeWidth={1} />
+              </g>
+            ))}
+            <line x1={PAD} y1={PAD} x2={PAD} y2={H - PAD} stroke="#777" strokeWidth={1.5} />
+            <line x1={PAD} y1={H - PAD} x2={W - PAD} y2={H - PAD} stroke="#777" strokeWidth={1.5} />
+            {/* Quadrant labels */}
+            <text x={PAD + 6} y={PAD + 13} fontSize={9} fill={MIT_RED} fontWeight={600}>High responsibility, low vulnerability</text>
+            <text x={W - PAD - 4} y={H - PAD - 7} fontSize={9} fill="#6B9FE4" fontWeight={600} textAnchor="end">Low responsibility, high vulnerability</text>
+            {/* Axis labels */}
+            <text x={(W + PAD) / 2} y={H - 4} fontSize={10.5} fill="#AAB0BA" textAnchor="middle">Vulnerability →</text>
+            <text x={10} y={H / 2} fontSize={10.5} fill="#AAB0BA" textAnchor="middle" transform={`rotate(-90,10,${H / 2})`}>← Responsibility</text>
+            {/* Actors */}
+            {ACTORS.map(a => {
+              const isHov = hovered === a.id;
+              return (
+                <g key={a.id} style={{ cursor: "pointer" }} onMouseEnter={() => setHovered(a.id)} onMouseLeave={() => setHovered(null)}>
+                  <circle cx={toX(a.x)} cy={toY(a.y)} r={isHov ? 20 : 15} fill={a.col} fillOpacity={isHov ? 0.25 : 0.12} stroke={a.col} strokeWidth={isHov ? 2.5 : 1.8} style={{ transition: "all 0.15s" }} />
+                  <text x={toX(a.x)} y={toY(a.y) + 4} fontSize={isHov ? 11 : 10} fill={a.col} textAnchor="middle" fontWeight={700} style={{ pointerEvents: "none" }}>{a.id}</text>
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Sector vulnerability ────────────────────────────────────────
+
+function SectorPanel() {
+  const [hov, setHov] = useState(null);
+  const maxVuln = 5;
+  return (
+    <div style={{ background: "#fff", borderRadius: 3, border: "1px solid #E8ECF0", boxShadow: "0 1px 6px rgba(0,0,0,0.04)", marginBottom: 16, overflow: "hidden" }}>
+      <div style={{ borderBottom: `3px solid ${MIT_RED}`, padding: "20px 24px 16px" }}>
+        <SectionTag number="3" label="Which sectors are most exposed?" />
+        <h2 style={{ fontSize: 22, fontWeight: 700, color: "#000", marginBottom: 8, letterSpacing: "-0.3px", lineHeight: 1.25 }}>
+          Information, finance, and national security face highest vulnerability
+        </h2>
+        <p style={{ fontSize: 14, color: MIT_GRAY, lineHeight: 1.65, maxWidth: 700 }}>
+          Experts assessed vulnerability across 14 industry sectors. Sectors with deep AI integration and critical decision-making face the greatest exposure. Consensus was strongest at the extremes.
+        </p>
+      </div>
+      <div style={{ padding: "16px 24px 20px" }}>
+        {SECTORS.map((s, i) => {
+          const isHov = hov === i;
+          const pct = (s.vuln / maxVuln) * 100;
+          const isHigh = s.vuln >= 4.0;
+          const isMod = s.vuln >= 3.0;
+          const col = isHigh ? MIT_RED : isMod ? "#D97706" : MIT_GRAY;
+          return (
+            <div key={i}
+              style={{ display: "flex", alignItems: "center", gap: 0, padding: "5px 0", cursor: "pointer" }}
+              onMouseEnter={() => setHov(i)} onMouseLeave={() => setHov(null)}>
+              <div style={{ width: 200, flexShrink: 0, textAlign: "right", paddingRight: 14 }}>
+                <span style={{ fontSize: 12, color: isHov ? "#000" : "#555", fontWeight: isHov ? 600 : 400 }}>{s.name}</span>
+              </div>
+              <div style={{ flex: 1, height: 16, background: "#F1F5F9", borderRadius: 3, overflow: "hidden" }}>
+                <div style={{
+                  height: "100%", width: `${pct}%`, borderRadius: 3,
+                  background: col, opacity: isHov ? 0.9 : 0.65, transition: "all 0.15s"
+                }} />
+              </div>
+              <div style={{ width: 80, flexShrink: 0, paddingLeft: 10 }}>
+                <span style={{
+                  fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 10,
+                  background: isHigh ? "#FEF2F2" : isMod ? "#FFFBEB" : "#F1F5F9",
+                  color: col
+                }}>
+                  {s.vuln >= 4.0 ? "Extreme" : s.vuln >= 3.0 ? "High" : "Moderate"}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ padding: "12px 24px 16px", borderTop: "1px solid #F1F5F9", display: "flex", justifyContent: "center" }}>
+        <button style={{ fontSize: 12, fontWeight: 700, color: MIT_RED, background: "none", border: `1.5px solid ${MIT_RED}`, borderRadius: 2, padding: "8px 16px", cursor: "pointer" }}>
+          Explore sector vulnerability by risk domain →
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── "Stubborn risks" callout ────────────────────────────────────
+
+function StubbornRisksCallout() {
+  const risks = [
+    { name: "Dangerous capabilities", bau: 22, mit: 12, delta: 10 },
+    { name: "Cyberattacks & weapons", bau: 21, mit: 12, delta: 9 },
+    { name: "Environmental harm", bau: 17, mit: 12, delta: 5 },
+    { name: "Inequality", bau: 17, mit: 11, delta: 6 },
+    { name: "Power centralization", bau: 18, mit: 11, delta: 7 },
+  ];
+  return (
+    <div style={{ background: "#000", borderRadius: 3, marginBottom: 16, borderLeft: `4px solid ${MIT_RED}`, overflow: "hidden", padding: "24px 28px" }}>
+      <p style={{ fontSize: 12, fontWeight: 700, color: MIT_RED, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Stubborn risks</p>
+      <h3 style={{ fontSize: 18, fontWeight: 700, color: "#fff", lineHeight: 1.3, marginBottom: 10 }}>
+        Five risks remain above 10% catastrophic probability even assuming pragmatic mitigations
+      </h3>
+      <p style={{ fontSize: 13, color: "#888", lineHeight: 1.7, marginBottom: 18, maxWidth: 600 }}>
+        These risks arise from structural dynamics — economies of scale, self-reinforcing advantages, and feedback loops between commercial and political power — not from discrete failures that technical safeguards alone can resolve.
+      </p>
+      <div style={{ display: "flex", gap: 10 }}>
+        {risks.map((r, i) => (
+          <div key={i} style={{ flex: 1, background: "#111", borderRadius: 3, padding: "14px 12px", border: "1px solid #1a1a1a" }}>
+            <div style={{ fontSize: 28, fontWeight: 700, color: MIT_RED, lineHeight: 1, marginBottom: 4 }}>{r.mit}%</div>
+            <div style={{ fontSize: 9, color: "#555", marginBottom: 8 }}>with mitigations (was {r.bau}%)</div>
+            <div style={{ fontSize: 11, color: "#ccc", fontWeight: 600, lineHeight: 1.3 }}>{r.name}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── What's next / Index connection ──────────────────────────────
+
+function WhatsNextPanel() {
+  return (
+    <div style={{ background: "#fff", borderRadius: 3, border: "1px solid #E8ECF0", boxShadow: "0 1px 6px rgba(0,0,0,0.04)", marginBottom: 16, overflow: "hidden" }}>
+      <div style={{ borderBottom: `3px solid ${MIT_RED}`, padding: "20px 24px 16px" }}>
+        <SectionTag number="4" label="What are organizations actually doing?" />
+        <h2 style={{ fontSize: 22, fontWeight: 700, color: "#000", marginBottom: 8, letterSpacing: "-0.3px", lineHeight: 1.25 }}>
+          These expert priorities form the foundation of the MIT AI Risk Index
+        </h2>
+        <p style={{ fontSize: 14, color: MIT_GRAY, lineHeight: 1.65, maxWidth: 700 }}>
+          The Delphi study tells us which risks matter most and who should act. The AI Risk Index evaluates how 200+ major organisations are actually responding — revealing the gaps between expert recommendations and real-world action.
+        </p>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, padding: "16px 24px 20px" }}>
+        {[
+          { step: "1", title: "Prioritize risks", desc: "Experts identify the most severe risks and map them to actors and sectors", status: "Complete", statusCol: "#059669", done: true, bg: "#ECFDF5", border: "#BBF7D0" },
+          { step: "2", title: "Capture responses", desc: "Document review of 200+ organisations' AI risk policies and actions", status: "In progress", statusCol: "#D97706", bg: "#FFFBEB", border: "#FDE68A", cta: "View preliminary results →" },
+          { step: "3", title: "Identify gaps", desc: "Compare what experts recommend with what organisations are doing", status: "Coming 2026", statusCol: MIT_GRAY, bg: "#F8FAFC", border: "#E2E8F0" },
+        ].map((item, i) => (
+          <div key={i} style={{
+            padding: "18px 20px", display: "flex", flexDirection: "column",
+            background: item.bg, border: `1.5px solid ${item.border}`, borderRadius: 4
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <div style={{ width: 24, height: 24, borderRadius: "50%", background: item.done ? "#059669" : "#000", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {item.done ? (
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M4 8l3 3 5-6" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                ) : (
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "#fff" }}>{item.step}</span>
+                )}
+              </div>
+              <span style={{ fontSize: 10, fontWeight: 700, color: item.statusCol, textTransform: "uppercase", letterSpacing: "0.08em" }}>{item.status}</span>
+            </div>
+            <p style={{ fontSize: 15, fontWeight: 700, color: "#000", marginBottom: 6 }}>{item.title}</p>
+            <p style={{ fontSize: 12, color: "#555", lineHeight: 1.55, marginBottom: item.cta ? 14 : 0 }}>{item.desc}</p>
+            {item.cta && (
+              <button style={{ fontSize: 11, fontWeight: 700, color: MIT_RED, background: "#fff", border: `1.5px solid ${MIT_RED}`, borderRadius: 2, padding: "7px 14px", cursor: "pointer", alignSelf: "flex-start", marginTop: "auto" }}>
+                {item.cta}
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+      {/* Subscribe strip */}
+      <div style={{ borderTop: "1px solid #F1F5F9", background: "#FAFAFA", padding: "18px 24px", display: "flex", alignItems: "center", gap: 16 }}>
+        <div style={{ flex: 1 }}>
+          <p style={{ fontSize: 13, fontWeight: 700, color: "#000", marginBottom: 2 }}>Get notified when the full Index launches</p>
+          <p style={{ fontSize: 12, color: MIT_GRAY }}>We'll send you a single email when the organisational response data and gap analysis are published.</p>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+          <input placeholder="Your email address" style={{ fontSize: 12, border: "1px solid #C2C0BF", borderRadius: 2, padding: "9px 14px", outline: "none", background: "#fff", width: 200 }} />
+          <button style={{ fontSize: 12, fontWeight: 700, background: MIT_RED, color: "#fff", border: "none", borderRadius: 2, padding: "9px 16px", cursor: "pointer", whiteSpace: "nowrap" }}>Notify me</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Preview illustrations for deep dive cards ──────────────────
+
+function PreviewSeverity({ color }) {
+  const bars = [22, 21, 18, 17, 17, 14, 13, 12, 11, 10];
+  return (
+    <svg width="220" height="84" viewBox="0 0 220 84">
+      {bars.map((v, i) => (
+        <rect key={i} x={14} y={i * 8 + 2} width={(v / 25) * 180} height={6} rx={1.5}
+          fill={color} opacity={0.3 + (v / 25) * 0.5} />
+      ))}
+    </svg>
+  );
+}
+
+function PreviewActors({ color }) {
+  const dots = [
+    { x: 50, y: 16, col: color }, { x: 66, y: 24, col: color },
+    { x: 58, y: 34, col: "#D97706" }, { x: 82, y: 40, col: "#D97706" },
+    { x: 52, y: 56, col: "#059669" },
+    { x: 130, y: 62, col: "#6B9FE4" }, { x: 158, y: 70, col: "#6B9FE4" },
+  ];
+  return (
+    <svg width="220" height="84" viewBox="0 0 220 84">
+      <line x1={20} y1={6} x2={20} y2={78} stroke="#E2E8F0" strokeWidth={0.75} />
+      <line x1={20} y1={78} x2={200} y2={78} stroke="#E2E8F0" strokeWidth={0.75} />
+      {dots.map((d, i) => (
+        <circle key={i} cx={d.x} cy={d.y} r={6} fill={d.col} fillOpacity={0.2} stroke={d.col} strokeWidth={1.3} />
+      ))}
+    </svg>
+  );
+}
+
+function PreviewSectors({ color }) {
+  const palette = ["#fef3c7", "#fde68a", "#f59e0b", "#dc2626"];
+  const vals = [
+    [3,3,2,2,1,1], [3,2,3,1,1,1], [2,2,2,2,1,0], [2,1,2,1,1,0],
+    [1,1,1,1,1,0], [1,1,1,0,0,0], [0,0,1,0,0,0],
+  ];
+  return (
+    <svg width="220" height="84" viewBox="0 0 220 84">
+      {vals.map((row, r) => row.map((v, c) => (
+        <rect key={`${r}-${c}`} x={c * 30 + 16} y={r * 10 + 4} width={27} height={8} rx={1.5}
+          fill={palette[v]} opacity={0.85} />
+      )))}
+    </svg>
+  );
+}
+
+function PreviewConcerns({ color }) {
+  const bars = [82, 72, 60, 52, 44, 38, 30, 24];
+  return (
+    <svg width="220" height="84" viewBox="0 0 220 84">
+      {bars.map((v, i) => (
+        <rect key={i} x={14} y={i * 10 + 2} width={(v / 90) * 180} height={7} rx={1.5}
+          fill={color} opacity={0.35 + (v / 90) * 0.45} />
+      ))}
+    </svg>
+  );
+}
+
+// ─── Deep dive cards (navigator style) ───────────────────────────
+
+function DeepDiveCards() {
+  const cards = [
+    { question: "How severe is each risk?", desc: "Probability distributions across 5 severity levels for all 24 risks, under both business-as-usual and pragmatic mitigation scenarios.", col: MIT_RED, Preview: PreviewSeverity },
+    { question: "Who is vulnerable and who is responsible?", desc: "Vulnerability and responsibility ratings across 7 actor types and 24 risk domains. Toggle between dimensions in a single interactive view.", col: "#7C3AED", Preview: PreviewActors },
+    { question: "Which sectors are most exposed?", desc: "Sector-specific vulnerability assessments for 14 industries, showing which face greatest exposure to each risk category.", col: "#D97706", Preview: PreviewSectors },
+    { question: "Which risks concern experts most, and why?", desc: "Expert concern rankings with qualitative reasoning and commentary from the 272-person panel.", col: "#0369A1", Preview: PreviewConcerns },
+  ];
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <p style={{ fontSize: 20, fontWeight: 700, color: "#000", letterSpacing: "-0.2px", marginBottom: 4 }}>Explore the full expert survey data</p>
+      <p style={{ fontSize: 13, color: MIT_GRAY, marginBottom: 14 }}>Dive deeper into specific results from the 272-expert Delphi study.</p>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        {cards.map(({ Preview, ...card }, i) => (
+          <button key={i}
+            style={{
+              textAlign: "left", background: "#fff", border: "1.5px solid #000", borderRadius: 3,
+              padding: "16px 18px 0", cursor: "pointer", transition: "all 0.15s", boxShadow: "none",
+              overflow: "hidden", display: "flex", flexDirection: "column", position: "relative"
+            }}
+            onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.12)"; }}
+            onMouseLeave={e => { e.currentTarget.style.boxShadow = "none"; }}
+          >
+            <div style={{ position: "absolute", top: 10, left: 12, width: 22, height: 22, borderRadius: "50%", background: "#000", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#fff" }}>{i + 1}</span>
+            </div>
+            <div style={{ background: "#FAFAFA", borderRadius: 2, padding: "10px 8px 6px", marginBottom: 10, border: "1px solid #E8ECF0", overflow: "hidden", flexShrink: 0 }}>
+              <Preview color={card.col} />
+            </div>
+            <p style={{ fontSize: 12.5, color: "#555", lineHeight: 1.6, marginBottom: 10, flexShrink: 0 }}>{card.desc}</p>
+            <div style={{ flex: 1 }} />
+            <div style={{ background: card.col, margin: "0 -18px", padding: "12px 18px", flexShrink: 0, minHeight: 52, display: "flex", alignItems: "center" }}>
+              <p style={{ fontSize: 14, fontWeight: 600, color: "#fff", lineHeight: 1.4, margin: 0 }}>{card.question}</p>
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Method summary ──────────────────────────────────────────────
+
+function MethodSummary() {
+  return (
+    <div style={{ background: "#fff", border: "1px solid #E8ECF0", borderRadius: 3, boxShadow: "0 1px 6px rgba(0,0,0,0.04)", marginBottom: 16, overflow: "hidden" }}>
+      <div style={{ borderBottom: `3px solid #000`, padding: "20px 24px 16px" }}>
+        <p style={{ fontSize: 18, fontWeight: 700, color: "#000", marginBottom: 8 }}>About this study</p>
+        <p style={{ fontSize: 14, color: "#555", lineHeight: 1.7, maxWidth: 700 }}>
+          We conducted a three-round Delphi study with 272 international AI experts from academia, industry, government, and civil society across 37 countries. In each round, experts rated risks anonymously, reviewed the distribution of their peers' responses and reasoning, and revised their judgements. 214 experts (79%) completed all three rounds.
+        </p>
+      </div>
+      <div style={{ padding: "20px 24px" }}>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button style={{ fontSize: 12, fontWeight: 700, background: "#000", color: "#fff", border: "none", borderRadius: 2, padding: "10px 18px", cursor: "pointer" }}>
+            Read the full paper →
+          </button>
+          <button style={{ fontSize: 12, fontWeight: 700, background: "#fff", color: "#000", border: "1.5px solid #000", borderRadius: 2, padding: "9px 16px", cursor: "pointer" }}>
+            Download the data →
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main app ────────────────────────────────────────────────────
+
+export default function App() {
+  const [counted, setCounted] = useState(0);
+  const [hasAnimated, setHasAnimated] = useState(false);
+  const statRef = useRef(null);
+
+  useEffect(() => {
+    if (hasAnimated) return;
+    const obs = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) {
+        setHasAnimated(true);
+        let n = 0;
+        const step = () => { n++; setCounted(n); if (n < 14) setTimeout(step, 80); };
+        step();
+      }
+    }, { threshold: 0.5 });
+    if (statRef.current) obs.observe(statRef.current);
+    return () => obs.disconnect();
+  }, [hasAnimated]);
+
+  return (
+    <div style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", background: MIT_WARM_WHITE, minHeight: "100vh" }}>
+
+      <div style={{ background: MIT_RED, height: 4 }} />
+
+      {/* Hero */}
+      <div style={{ background: "#000" }}>
+        <div style={{ maxWidth: 960, margin: "0 auto", padding: "48px 32px 40px" }}>
+          <p style={{ color: MIT_RED, fontSize: 13, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 12 }}>
+            MIT AI Risk Initiative · Expert Prioritization Survey
+          </p>
+          <h1 style={{ color: "#fff", fontSize: 38, fontWeight: 700, lineHeight: 1.08, letterSpacing: "-0.6px", maxWidth: 620, marginBottom: 14 }}>
+            How 272 experts prioritize the risks from AI
+          </h1>
+          <p style={{ color: "#AAB0BA", fontSize: 16, lineHeight: 1.75, maxWidth: 560, marginBottom: 32, fontWeight: 400 }}>
+            A three-round Delphi study of international AI experts, establishing consensus on which risks are{" "}
+            <span style={{ color: "#e0e0e0", fontWeight: 500 }}>most severe</span>, which actors and sectors are{" "}
+            <span style={{ color: "#e0e0e0", fontWeight: 500 }}>most vulnerable</span>, and who bears{" "}
+            <span style={{ color: "#e0e0e0", fontWeight: 500 }}>responsibility for mitigation</span>.
+          </p>
+
+          {/* Hero stat */}
+          <div ref={statRef} style={{ borderTop: "1px solid #1f1f1f", paddingTop: 24, display: "flex", gap: 48, alignItems: "flex-end" }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                <span style={{ color: MIT_RED, fontSize: 96, fontWeight: 700, lineHeight: 1, letterSpacing: "-3px" }}>{counted}</span>
+                <span style={{ color: "#4a4a4a", fontSize: 52, fontWeight: 700, letterSpacing: "-2px" }}>/24</span>
+              </div>
+              <p style={{ color: "#C2C0BF", fontSize: 14, marginTop: 6, maxWidth: 320, lineHeight: 1.5 }}>
+                risks with at least 10% probability of catastrophic outcomes under current trajectories
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: 24, paddingBottom: 20 }}>
+              {[
+                { label: "Top concern", value: "Cyberattacks & weapons", pct: "27% of experts", icon: "M8 1L15 14H1Z" },
+                { label: "Most vulnerable sectors", value: "Information, finance, and national security", pct: "", icon: "M2 4h12M2 8h8M2 12h10" },
+                { label: "Who should act?", value: "Developers & governments bear primary responsibility", pct: "Users & public bear most harm", icon: "M4 14V8l4-6 4 6v6" },
+              ].map((item, i) => (
+                <div key={i} style={{ maxWidth: 170, display: "flex", gap: 10, alignItems: "flex-start" }}>
+                  <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#1a1a1a", border: `1.5px solid ${MIT_RED}40`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2 }}>
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                      <path d={item.icon} stroke={MIT_RED} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p style={{ fontSize: 9, color: "#555", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4, fontWeight: 600 }}>{item.label}</p>
+                    <p style={{ fontSize: 13, color: "#ddd", fontWeight: 600, lineHeight: 1.3, marginBottom: 2 }}>{item.value}</p>
+                    {item.pct && <p style={{ fontSize: 11, color: MIT_RED, fontWeight: 600, lineHeight: 1.35 }}>{item.pct}</p>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ height: 3, background: MIT_RED }} />
+
+      {/* Main content */}
+      <div style={{ maxWidth: 960, margin: "0 auto", padding: "28px 32px 40px" }}>
+
+        {/* Section 1: Severity */}
+        <SeverityPanel />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
+          <ConcernPanel />
+          <StubbornRisksCallout />
+        </div>
+
+        {/* Section 2: Mismatch */}
+        <MismatchPanel />
+
+        {/* Section 3: Sectors */}
+        <SectorPanel />
+
+        {/* Deep dives */}
+        <DeepDiveCards />
+
+        {/* Section 4: What's next */}
+        <WhatsNextPanel />
+
+        {/* Method */}
+        <MethodSummary />
+      </div>
+
+      {/* Footer CTA */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>
+        <div style={{ background: "#000", padding: "36px 48px", borderTop: `3px solid ${MIT_RED}` }}>
+          <p style={{ fontSize: 18, fontWeight: 700, color: "#fff", marginBottom: 8 }}>Work with us</p>
+          <p style={{ fontSize: 14, color: "#888", lineHeight: 1.75, marginBottom: 20, maxWidth: 400 }}>We work with organisations, governments, and researchers to benchmark AI risk responses. Get in touch to find out how these findings can support your work.</p>
+          <button style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", background: MIT_RED, color: "#fff", border: "none", borderRadius: 2, padding: "11px 22px", cursor: "pointer" }}>
+            Get in touch →
+          </button>
+        </div>
+        <div style={{ background: MIT_WARM_WHITE, padding: "36px 48px", borderTop: `3px solid ${MIT_LIGHT_GRAY}` }}>
+          <p style={{ fontSize: 18, fontWeight: 700, color: "#000", marginBottom: 8 }}>Read the paper</p>
+          <p style={{ fontSize: 14, color: MIT_GRAY, lineHeight: 1.75, marginBottom: 20, maxWidth: 400 }}>The full Delphi study is available as a preprint, with all data publicly available for download.</p>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button style={{ fontSize: 12, fontWeight: 700, background: "#000", color: "#fff", border: "none", borderRadius: 2, padding: "11px 22px", cursor: "pointer" }}>
+              Read preprint →
+            </button>
+            <button style={{ fontSize: 12, fontWeight: 700, background: "#fff", color: "#000", border: "1.5px solid #000", borderRadius: 2, padding: "10px 20px", cursor: "pointer" }}>
+              Download data →
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ background: MIT_RED, height: 4 }} />
+    </div>
+  );
+}
