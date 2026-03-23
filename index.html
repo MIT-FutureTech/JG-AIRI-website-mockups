@@ -1,4 +1,21 @@
-import { useState, useEffect, useRef } from "react";
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MIT AI Risk – Delphi Data</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
+</style>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
 
 const MIT_RED = "#A31F34";
 const MIT_GRAY = "#8A8B8C";
@@ -557,7 +574,7 @@ function MethodSummary() {
 
 // ─── Main app ────────────────────────────────────────────────────
 
-export default function App() {
+function App() {
   const [counted, setCounted] = useState(0);
   const [hasAnimated, setHasAnimated] = useState(false);
   const statRef = useRef(null);
@@ -687,3 +704,8 @@ export default function App() {
     </div>
   );
 }
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
